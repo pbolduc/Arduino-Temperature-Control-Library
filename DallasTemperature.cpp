@@ -208,6 +208,55 @@ bool DallasTemperature::readScratchPad(const uint8_t* deviceAddress,
 	return (b == 1);
 }
 
+bool DallasTemperature::readTemperature(float *temperature, uint8_t resolution) {
+
+	if (temperature == NULL) {
+		return false;
+	}
+
+	// get the lsb mask based on temperature resolution
+	uint8_t lsbMask;
+
+	switch (resolution)
+	{
+		case 9: lsbMask  = 0b11111000; break;
+		case 10: lsbMask = 0b11111100; break;
+		case 11: lsbMask = 0b11111110; break;
+		default: lsbMask = 0b11111111; break;
+	}
+
+	// send the reset command and fail fast
+	uint8_t b = _wire->reset();
+	if (b == 0) {
+		return false;
+	}
+
+	_wire->skip();
+	_wire->write(READSCRATCH);
+
+	// Read all registers in a simple loop
+	// byte 0: temperature LSB
+	// byte 1: temperature MSB
+	// byte 2: high alarm temp
+	// byte 3: low alarm temp
+	// byte 4: DS18S20: store for crc
+	//         DS18B20 & DS1822: configuration register
+	// byte 5: internal use & crc
+	// byte 6: DS18S20: COUNT_REMAIN
+	//         DS18B20 & DS1822: store for crc
+	// byte 7: DS18S20: COUNT_PER_C
+	//         DS18B20 & DS1822: store for crc
+	// byte 8: SCRATCHPAD_CRC
+
+	uint8_t lsb = _wire->read();
+	uint8_t msb = _wire->read();
+
+	int16_t temp = ((uint16_t)msb) << 8 | ((uint16_t)(lsb & lsbMask));
+	*temperature = temp * 0.0625f /* 1/16 */;
+
+	return true;
+}
+
 void DallasTemperature::writeScratchPad(const uint8_t* deviceAddress,
 		const uint8_t* scratchPad) {
 
@@ -399,17 +448,21 @@ bool DallasTemperature::isConversionComplete() {
 }
 
 // sends command for all devices on the bus to perform a temperature conversion
-void DallasTemperature::requestTemperatures() {
+bool DallasTemperature::requestTemperatures() {
 
-	_wire->reset();
+	int b = _wire->reset();
+	if (b == 0)
+		return false;
+
 	_wire->skip();
 	_wire->write(STARTCONVO, parasite);
 
 	// ASYNC mode?
-	if (!waitForConversion)
-		return;
-	blockTillConversionComplete(bitResolution);
+	if (waitForConversion) {
+		blockTillConversionComplete(bitResolution);
+	}
 
+	return true;
 }
 
 // sends command for one device to perform a temperature by address

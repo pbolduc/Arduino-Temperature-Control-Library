@@ -101,6 +101,8 @@ public:
 	// read device's scratchpad
 	bool readScratchPad(const uint8_t*, uint8_t*);
 
+	bool readTemperature(float *, uint8_t);
+
 	// write device's scratchpad
 	void writeScratchPad(const uint8_t*, const uint8_t*);
 
@@ -129,7 +131,7 @@ public:
 	bool getCheckForConversion(void);
 
 	// sends command for all devices on the bus to perform a temperature conversion
-	void requestTemperatures(void);
+	bool requestTemperatures(void);
 
 	// sends command for one device to perform a temperature conversion by address
 	bool requestTemperaturesByAddress(const uint8_t*);
